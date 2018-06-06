@@ -1,56 +1,76 @@
 import { Component, OnInit } from '@angular/core';
+import { FormGroup, FormControl, Validators } from '@angular/forms';
+import { OrdemCompraService } from '../ordem-compra.service'
+import { CarrinhoService } from '../carrinho.service'; // in this case didnt use {} bcs of the 'default' export, just to practice
+import { Pedido } from '../shared/pedido.model';
+import { ItemCarrinho } from '../shared/item-carrinho.model';
 
 @Component({
   selector: 'app-ordem-compra',
   templateUrl: './ordem-compra.component.html',
-  styleUrls: ['./ordem-compra.component.css']
+  styleUrls: ['./ordem-compra.component.css'],
+  providers: [ OrdemCompraService ]
 })
 export class OrdemCompraComponent implements OnInit {
 
-  public endereco: string = '';
-  public numero: string = '';
-  public complemento: string = '';
-  public formaPagamento: string = '';
+  public idPedido: number;
+  public itensCarrinho: ItemCarrinho[] = [];
 
-  //controles de validação dos campos
-  public enderecoValido: boolean;
-  public numeroValido: boolean;
-  public complementoValido: boolean;
-  public formaPagamentoValido: boolean;
+  public formulario: FormGroup = new FormGroup({
+    endereco: new FormControl(null, [ Validators.required, Validators.minLength(3), Validators.maxLength(120) ]),
+    numero: new FormControl(null, [ Validators.required, Validators.minLength(1), Validators.maxLength(20) ]),
+    complemento: new FormControl(null),
+    formaDePagamento: new FormControl(null, [ Validators.required ])
+  });
 
-  //estados primitivos dos campos (pristine)
-  public enderecoEstadoPrimitivo: boolean = true;
-  public numeroEstadoPrimitivo: boolean = true;
-  public complementoEstadoPrimitivo: boolean = true;
-  public formaPagamentoEstadoPrimitivo: boolean = true;
 
-  constructor() { }
+  constructor(
+    private ordemCompraService: OrdemCompraService,
+    private carrinhoService: CarrinhoService
+  ) { }
 
   ngOnInit() {
+    this.itensCarrinho = this.carrinhoService.getItens();
   }
 
-  public atualizarEndereco(endereco: string): void {
-    this.enderecoEstadoPrimitivo = false;
-    this.enderecoValido = endereco && endereco.length > 3;
-    this.endereco = endereco;
+  public incrementarQuantidade(item: ItemCarrinho): void {
+    this.carrinhoService.incrementarQuantidade(item);
   }
 
-  public atualizarNumero(numero: string): void {
-    this.numeroEstadoPrimitivo = false;
-    this.numeroValido = numero && !!numero.match(/^\d+$/);
-    this.numero = numero;
+  public decrementarQuantidade(item: ItemCarrinho): void {
+    this.carrinhoService.decrementarQuantidade(item);
   }
 
-  public atualizarComplemento(complemento: string): void {
-    this.complementoEstadoPrimitivo = false;
-    this.complementoValido = !complemento || complemento.length > 3;
-    this.complemento = complemento;
+  public confirmarCompra(): void {
+    console.log(this.formulario);
+    if (!this.formulario.valid) {
+      this.destacarCamposInvalidosForm();
+    } else {
+      if (this.carrinhoService.getItens().length > 0) {
+        let pedido: Pedido = new Pedido(
+          this.formulario.value.endereco,
+          this.formulario.value.numero,
+          this.formulario.value.complemento,
+          this.formulario.value.formaDePagamento,
+          this.carrinhoService.getItens()
+        );
+
+        this.ordemCompraService.efetivarCompra(pedido)
+          .subscribe((idPedido: number) => {
+            this.idPedido = idPedido;
+            this.carrinhoService.limparItens();
+          });
+      } else {
+        alert('Você não incluiu nenhum item ao seu carrinho.');
+      }
+
+    }
   }
 
-  public atualizarFormaPagamento(formaPagamento: string): void {
-    this.formaPagamentoEstadoPrimitivo = false;
-    this.formaPagamentoValido = formaPagamento == 'dinheiro' || formaPagamento == 'debito';
-    this.formaPagamento = formaPagamento;
+  public destacarCamposInvalidosForm(): void {
+    this.formulario.get('endereco').markAsTouched();
+    this.formulario.get('numero').markAsTouched();
+    this.formulario.get('complemento').markAsTouched();
+    this.formulario.get('formaDePagamento').markAsTouched();
   }
-
 }
